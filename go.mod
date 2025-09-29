@@ -1,4 +1,4 @@
-module ikesy.org/valkeystore
+module github.com/ikesy/valkeystore
 
 go 1.25.1
 
