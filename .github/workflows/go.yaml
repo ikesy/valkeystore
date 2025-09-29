@@ -1,0 +1,70 @@
+name: Run Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: "go.mod"
+          check-latest: true
+      - name: Setup golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2
+  test:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest ]
+        go: [ 1.23, 1.24, 1.25 ]
+        valkey-version: [ 7, 8 ]
+        include:
+          - os: ubuntu-latest
+            go-build: ~/.cache/go-build
+    name: ${{ matrix.os }} @ Go ${{ matrix.go }} and Valkey ${{ matrix.valkey-version }}
+    runs-on: ${{ matrix.os }}
+    env:
+      GO111MODULE: on
+      GOPROXY: https://proxy.golang.org
+    steps:
+      - name: Start Valkey ${{ matrix.valkey-version }}
+      - uses: felipet/valkey-action@v1
+        with:
+          host port: 6379
+          container port: 6379
+          valkey version: ${{ matrix.valkey-version }}
+
+      - name: Set up Go ${{ matrix.go }}
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Checkout Code
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ${{ matrix.go-build }}
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Run Tests
+        run: |
+          go test -v -covermode=atomic -coverprofile=coverage.out
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          flags: ${{ matrix.os }},go-${{ matrix.go }}
