@@ -1,6 +1,6 @@
 module github.com/ikesy/valkeystore
 
-go 1.25.1
+go 1.24
 
 require (
 	github.com/gorilla/securecookie v1.1.2
