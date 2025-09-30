@@ -1,9 +1,10 @@
 # valkey
 
+[![GoDoc](https://godoc.org/github.com/ikesy/valkeystore?status.svg)](https://godoc.org/github.com/ikesy/valkeystore)
 [![codecov](https://codecov.io/gh/ikesy/valkeystore/branch/master/graph/badge.svg)](https://codecov.io/gh/ikesy/valkeystore)
 [![Go Report Card](https://goreportcard.com/badge/github.com/ikesy/valkeystore)](https://goreportcard.com/report/github.com/ikesy/valkeystore)
-[![GoDoc](https://godoc.org/github.com/ikesy/valkeystore?status.svg)](https://godoc.org/github.com/ikesy/valkeystore)
 [![Run Tests](https://github.com/ikesy/valkeystore/actions/workflows/go.yml/badge.svg)](https://github.com/ikesy/valkeystore/actions/workflows/go.yaml)
+![Go Version](https://img.shields.io/badge/go%20version-%3E=1.24-61CFDD.svg?style=flat-square)
 
 A session store backend for [gorilla/sessions](http://www.gorillatoolkit.org/pkg/sessions) - [src](https://github.com/gorilla/sessions).
 
