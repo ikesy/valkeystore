@@ -221,7 +221,7 @@ func (r *ValkeyStore) New(request *http.Request, name string) (*sessions.Session
 		err = securecookie.DecodeMulti(name, c.Value, &session.ID, r.Codecs...)
 		if err == nil {
 			ok, err = r.load(session)
-			session.IsNew = !(err == nil && ok) // not new if no error and data available
+			session.IsNew = err != nil || !ok // not new if no error and data available
 		}
 	}
 

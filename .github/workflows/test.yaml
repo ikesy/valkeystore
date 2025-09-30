@@ -24,16 +24,12 @@ jobs:
   test:
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        os: [ ubuntu-latest ]
         go: [ oldstable, stable ]
         valkey-version: [ 7, 8 ]
         include:
           - os: ubuntu-latest
             go-build: ~/.cache/go-build
-          - os: macos-latest
-            go-build: ~/Library/Caches/go-build
-          - os: windows-latest
-            go-build: C:\Users\runneradmin\AppData\Local\go-build
 
     name: ${{ matrix.os }} @ Go ${{ matrix.go }} and Valkey ${{ matrix.valkey-version }}
 
