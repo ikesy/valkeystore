@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/base32"
 	"encoding/gob"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -15,161 +14,74 @@ import (
 	"github.com/valkey-io/valkey-go"
 )
 
-// Amount of time for cookies/valkey keys to expire.
-var (
-	sessionExpire   = 86400 * 30
-	maxAge          = 60 * 20
-	maxLength       = 4096 // Max length of a session in bytes.
-	randomKeyLength = 32   // Length of random key to generate if none exists.
+const (
+	sessionExpire   = 3600 * 24 * 30 // 30 days
+	maxLength       = 4096           // Max length of a session in bytes.
+	randomKeyLength = 32             // Length of random key to generate if none exists.
 )
 
-// SessionSerializer provides an interface hook for alternative serializers.
-type SessionSerializer interface {
-	Deserialize(data []byte, session *sessions.Session) error
-	Serialize(session *sessions.Session) ([]byte, error)
-}
-
-// JSONSerializer encode the session map to JSON.
-type JSONSerializer struct{}
-
-// Serialize to JSON. Will err if there are unmarshalled key values.
-func (r JSONSerializer) Serialize(session *sessions.Session) ([]byte, error) {
-	m := make(map[string]any, len(session.Values))
-
-	for k, v := range session.Values {
-		ks, ok := k.(string)
-		if !ok {
-			err := fmt.Errorf("non-string key value, cannot serialize session to JSON: %v", k)
-			fmt.Printf("valkeystore.JSONSerializer.serialize() Error: %v", err)
-
-			return nil, err
-		}
-
-		m[ks] = v
-	}
-
-	return json.Marshal(m)
-}
-
-// Deserialize back to map[string]interface{}.
-func (r JSONSerializer) Deserialize(data []byte, session *sessions.Session) error {
-	m := make(map[string]any)
-	if err := json.Unmarshal(data, &m); err != nil {
-		fmt.Printf("valkeystore.JSONSerializer.deserialize() Error: %v", err)
-
-		return err
-	}
-
-	for k, v := range m {
-		session.Values[k] = v
-	}
-
-	return nil
-}
-
-// GobSerializer uses gob package to encode the session map.
-type GobSerializer struct{}
-
-// Serialize using gob.
-func (r GobSerializer) Serialize(session *sessions.Session) ([]byte, error) {
-	buf := new(bytes.Buffer)
-	enc := gob.NewEncoder(buf)
-	err := enc.Encode(session.Values)
-
-	if err == nil {
-		return buf.Bytes(), nil
-	}
-
-	return nil, err
-}
-
-// Deserialize back to map[interface{}]interface{}.
-func (r GobSerializer) Deserialize(data []byte, session *sessions.Session) error {
-	dec := gob.NewDecoder(bytes.NewBuffer(data))
-
-	return dec.Decode(&session.Values)
-}
-
+// ValkeyStore represents a valkey session store.
 type ValkeyStore struct {
-	Client        valkey.Client
-	Codecs        []securecookie.Codec
-	Options       *sessions.Options // default configuration
-	DefaultMaxAge int               // default Redis TTL for a MaxAge == 0 session
-	maxLength     int
-	keyPrefix     string
-	serializer    SessionSerializer
+	Codecs    []securecookie.Codec
+	Options   *sessions.Options // default configuration
+	keyPrefix string
+	client    valkey.Client
 }
 
-func NewValkeyStore(address []string, username, password string, keyPairs ...[]byte) (*ValkeyStore, error) {
-	return NewValkeyStoreWithDB(address, username, password, 0, keyPairs...)
+// New creates a new valkey store with the given parameters and key pairs.
+func New(address []string, username, password string, keyPairs ...[]byte) (*ValkeyStore, error) {
+	return NewWithDatabase(address, username, password, 0, keyPairs...)
 }
 
-func NewValkeyStoreWithDB(
+// NewWithDatabase creates a new valkey store with the given parameters and key pairs.
+func NewWithDatabase(
 	address []string,
 	username,
 	password string,
-	db int, keyPairs ...[]byte,
+	database int,
+	keyPairs ...[]byte,
 ) (*ValkeyStore, error) {
 	client, err := valkey.NewClient(valkey.ClientOption{
 		InitAddress: address,
 		Username:    username,
 		Password:    password,
-		SelectDB:    db,
+		SelectDB:    database,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return NewValkeyStoreWithClient(client, keyPairs...)
+	return NewWithClient(client, keyPairs...)
 }
 
-func NewValkeyStoreWithURL(url string, keyPairs ...[]byte) (*ValkeyStore, error) {
+// NewWithURL creates a new valkey store with the given URL and key pairs.
+func NewWithURL(url string, keyPairs ...[]byte) (*ValkeyStore, error) {
 	client, err := valkey.NewClient(valkey.MustParseURL(url))
 	if err != nil {
 		return nil, err
 	}
 
-	return NewValkeyStoreWithClient(client, keyPairs...)
+	return NewWithClient(client, keyPairs...)
 }
 
-func NewValkeyStoreWithClient(client valkey.Client, keyPairs ...[]byte) (*ValkeyStore, error) {
+// NewWithClient creates a new valkey store with the given client and key pairs.
+func NewWithClient(client valkey.Client, keyPairs ...[]byte) (*ValkeyStore, error) {
 	store := &ValkeyStore{
-		Client: client,
 		Codecs: securecookie.CodecsFromPairs(keyPairs...),
 		Options: &sessions.Options{
 			Path:   "/",
 			MaxAge: sessionExpire,
 		},
-		DefaultMaxAge: maxAge,
-		maxLength:     maxLength,
-		keyPrefix:     "session_",
-		serializer:    GobSerializer{},
+		keyPrefix: "session-",
+		client:    client,
 	}
-	_, err := store.ping()
 
-	return store, err
-}
-
-// SetMaxLength sets ValkeyStore.maxLength if the `length` argument is greater or equal 0
-// maxLength restricts the maximum length of new sessions to l.
-// If length is 0 there is no limit to the size of a session, use with caution.
-// The default for a new ValkeyStore is 4096. Redis allows for max.
-// value sizes of up to 512MB (https://valkey.io/topics/data-types)
-// Default: 4096.
-func (r *ValkeyStore) SetMaxLength(length int) {
-	if length >= 0 {
-		r.maxLength = length
-	}
+	return store, store.ping()
 }
 
 // SetKeyPrefix set the prefix.
-func (r *ValkeyStore) SetKeyPrefix(prefix string) {
-	r.keyPrefix = prefix
-}
-
-// SetSerializer sets the session serializer.
-func (r *ValkeyStore) SetSerializer(serializer SessionSerializer) {
-	r.serializer = serializer
+func (r *ValkeyStore) SetKeyPrefix(keyPrefix string) {
+	r.keyPrefix = keyPrefix
 }
 
 // SetMaxAge restricts the maximum age, in seconds, of the session record
@@ -183,20 +95,21 @@ func (r *ValkeyStore) SetSerializer(serializer SessionSerializer) {
 // Set it to 0 for no restriction.
 // Because we use `MaxAge` also in SecureCookie encrypting algorithm you should
 // use this function to change `MaxAge` value.
-func (r *ValkeyStore) SetMaxAge(age int) {
-	r.Options.MaxAge = age
+func (r *ValkeyStore) SetMaxAge(maxAge int) {
+	r.Options.MaxAge = maxAge
 
 	for i := range r.Codecs {
 		if cookie, ok := r.Codecs[i].(*securecookie.SecureCookie); ok {
-			cookie.MaxAge(age)
+			cookie.MaxAge(maxAge)
 		} else {
 			fmt.Printf("Can't change MaxAge on codec %v\n", r.Codecs[i])
 		}
 	}
 }
 
+// Close closes the valkey client connection.
 func (r *ValkeyStore) Close() {
-	r.Client.Close()
+	r.client.Close()
 }
 
 // Get returns a session for the given name after adding it to the registry.
@@ -206,18 +119,13 @@ func (r *ValkeyStore) Get(request *http.Request, name string) (*sessions.Session
 
 // New returns a session for the given name without adding it to the registry.
 func (r *ValkeyStore) New(request *http.Request, name string) (*sessions.Session, error) {
-	var (
-		err error
-		ok  bool
-	)
-
+	var err error
 	session := sessions.NewSession(r, name)
-	// make a copy
-	options := *r.Options
-	session.Options = &options
+	session.Options = &*r.Options
 	session.IsNew = true
 
 	if c, errCookie := request.Cookie(name); errCookie == nil {
+		var ok bool
 		err = securecookie.DecodeMulti(name, c.Value, &session.ID, r.Codecs...)
 		if err == nil {
 			ok, err = r.load(session)
@@ -232,7 +140,7 @@ func (r *ValkeyStore) New(request *http.Request, name string) (*sessions.Session
 func (r *ValkeyStore) Save(request *http.Request, writer http.ResponseWriter, session *sessions.Session) error {
 	// Marked for deletion.
 	if session.Options.MaxAge <= 0 {
-		if err := r.delete(session); err != nil {
+		if err := r.erase(session); err != nil {
 			return err
 		}
 
@@ -263,9 +171,9 @@ func (r *ValkeyStore) Save(request *http.Request, writer http.ResponseWriter, se
 
 // Delete removes the session from valkey, and sets the cookie to expire.
 func (r *ValkeyStore) Delete(request *http.Request, writer http.ResponseWriter, session *sessions.Session) error {
-	if err := r.Client.Do(
+	if err := r.client.Do(
 		context.Background(),
-		r.Client.B().Del().Key(r.keyPrefix+session.ID).Build(),
+		r.client.B().Del().Key(r.keyPrefix+session.ID).Build(),
 	).Error(); err != nil {
 		return err
 	}
@@ -282,41 +190,38 @@ func (r *ValkeyStore) Delete(request *http.Request, writer http.ResponseWriter, 
 }
 
 // ping does an internal ping against a valkey server.
-func (r *ValkeyStore) ping() (bool, error) {
-	data, err := r.Client.Do(context.Background(), r.Client.B().Ping().Build()).ToString()
-	if err != nil {
-		return false, err
-	}
-
-	return data == "PONG", nil
-}
-
-// save stores the session in valkey.
-func (r *ValkeyStore) save(session *sessions.Session) error {
-	b, err := r.serializer.Serialize(session)
+func (r *ValkeyStore) ping() error {
+	data, err := r.client.Do(context.Background(), r.client.B().Ping().Build()).ToString()
 	if err != nil {
 		return err
 	}
 
-	if r.maxLength != 0 && len(b) > r.maxLength {
+	if data != "PONG" {
+		return fmt.Errorf("valkey ping failed, unexpected response: %v", data)
+	}
+
+	return nil
+}
+
+// save stores the session in valkey.
+func (r *ValkeyStore) save(session *sessions.Session) error {
+	buffer := new(bytes.Buffer)
+	encoder := gob.NewEncoder(buffer)
+	if err := encoder.Encode(session.Values); err != nil {
+		return err
+	}
+
+	if len(buffer.Bytes()) > maxLength {
 		return fmt.Errorf("sessionstore: the value to store is too big")
 	}
 
-	ctx := context.Background()
-	conn := r.Client
-
-	age := session.Options.MaxAge
-	if age == 0 {
-		age = r.DefaultMaxAge
-	}
-
-	return conn.Do(ctx, conn.B().Setex().Key(r.keyPrefix+session.ID).Seconds(int64(age)).Value(string(b)).Build()).Error()
+	return r.client.Do(context.Background(), r.client.B().Setex().Key(r.keyPrefix+session.ID).Seconds(int64(r.Options.MaxAge)).Value(string(buffer.Bytes())).Build()).Error()
 }
 
 // load reads the session from valkey.
 // returns true if there is a session data in DB.
 func (r *ValkeyStore) load(session *sessions.Session) (bool, error) {
-	resp := r.Client.Do(context.Background(), r.Client.B().Get().Key(r.keyPrefix+session.ID).Build())
+	resp := r.client.Do(context.Background(), r.client.B().Get().Key(r.keyPrefix+session.ID).Build())
 	if err := resp.Error(); err != nil {
 		if valkey.IsValkeyNil(err) {
 			return false, nil
@@ -330,10 +235,11 @@ func (r *ValkeyStore) load(session *sessions.Session) (bool, error) {
 		return false, err
 	}
 
-	return true, r.serializer.Deserialize([]byte(data), session)
+	decoder := gob.NewDecoder(bytes.NewBuffer([]byte(data)))
+	return true, decoder.Decode(&session.Values)
 }
 
-// delete removes keys from valkey if MaxAge<0.
-func (r *ValkeyStore) delete(session *sessions.Session) error {
-	return r.Client.Do(context.Background(), r.Client.B().Del().Key(r.keyPrefix+session.ID).Build()).Error()
+// erase removes keys from valkey if MaxAge<0.
+func (r *ValkeyStore) erase(session *sessions.Session) error {
+	return r.client.Do(context.Background(), r.client.B().Del().Key(r.keyPrefix+session.ID).Build()).Error()
 }

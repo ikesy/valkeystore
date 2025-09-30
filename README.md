@@ -74,28 +74,12 @@ func main() {
 
 ## Configuration
 
-### SetMaxLength
-
-Sets the maximum length of new sessions. If the length is 0, there is no limit to the size of a session.
-
-```go
-store.SetMaxLength(4096)
-```
-
 ### SetKeyPrefix
 
 Sets the prefix for session keys in Redis.
 
 ```go
-store.SetKeyPrefix("myprefix_")
-```
-
-### SetSerializer
-
-Sets the serializer for session data. The default is GobSerializer.
-
-```go
-store.SetSerializer(redistore.JSONSerializer{})
+store.SetKeyPrefix("myprefix-")
 ```
 
 ### SetMaxAge
@@ -104,40 +88,6 @@ Sets the maximum age, in seconds, of the session record both in the database and
 
 ```go
 store.SetMaxAge(86400 * 7) // 7 days
-```
-
-## Custom Serializers
-
-### JSONSerializer
-
-Serializes session data to JSON.
-
-```go
-type JSONSerializer struct{}
-
-func (s JSONSerializer) Serialize(ss *sessions.Session) ([]byte, error) {
-  // Implementation
-}
-
-func (s JSONSerializer) Deserialize(d []byte, ss *sessions.Session) error {
-  // Implementation
-}
-```
-
-### GobSerializer
-
-Serializes session data using the gob package.
-
-```go
-type GobSerializer struct{}
-
-func (s GobSerializer) Serialize(ss *sessions.Session) ([]byte, error) {
-  // Implementation
-}
-
-func (s GobSerializer) Deserialize(d []byte, ss *sessions.Session) error {
-  // Implementation
-}
 ```
 
 ## License

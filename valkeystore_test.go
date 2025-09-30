@@ -58,10 +58,6 @@ func NewRecorder() *ResponseRecorder {
 	}
 }
 
-// DefaultRemoteAddr is the default remote address to return in RemoteAddr if
-// an explicit DefaultRemoteAddr isn't set on ResponseRecorder.
-const DefaultRemoteAddr = "1.2.3.4"
-
 // Header returns the response headers.
 func (rw *ResponseRecorder) Header() http.Header {
 	return rw.HeaderMap
@@ -72,9 +68,11 @@ func (rw *ResponseRecorder) Write(buf []byte) (int, error) {
 	if rw.Body != nil {
 		rw.Body.Write(buf)
 	}
+
 	if rw.Code == 0 {
 		rw.Code = http.StatusOK
 	}
+
 	return len(buf), nil
 }
 
@@ -97,11 +95,13 @@ type FlashMessage struct {
 
 func TestValkeyStore(t *testing.T) {
 	var cookies []string
+
 	var ok bool
 
 	t.Run("Round 1", func(t *testing.T) {
 		addr := setup()
-		store, err := NewValkeyStore(addr, "", "", []byte("secret-key"))
+		store, err := New(addr, "", "", []byte("secret-key"))
+
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -133,7 +133,7 @@ func TestValkeyStore(t *testing.T) {
 
 	t.Run("Round 2", func(t *testing.T) {
 		addr := setup()
-		store, err := NewValkeyStore(addr, "", "", []byte("secret-key"))
+		store, err := New(addr, "", "", []byte("secret-key"))
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -175,7 +175,7 @@ func TestValkeyStore(t *testing.T) {
 
 	t.Run("Round 3", func(t *testing.T) {
 		addr := setup()
-		store, err := NewValkeyStore(addr, "", "", []byte("secret-key"))
+		store, err := New(addr, "", "", []byte("secret-key"))
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -204,7 +204,7 @@ func TestValkeyStore(t *testing.T) {
 
 	t.Run("Round 4", func(t *testing.T) {
 		addr := setup()
-		store, err := NewValkeyStore(addr, "", "", []byte("secret-key"))
+		store, err := New(addr, "", "", []byte("secret-key"))
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -233,7 +233,7 @@ func TestValkeyStore(t *testing.T) {
 
 	t.Run("Round 6", func(t *testing.T) {
 		addr := setup()
-		store, err := NewValkeyStore(addr, "", "", []byte("secret-key"))
+		store, err := New(addr, "", "", []byte("secret-key"))
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -252,60 +252,11 @@ func TestValkeyStore(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected an error, got nil")
 		}
-
-		store.SetMaxLength(4096 * 3)
-		err = session.Save(req, w)
-		if err != nil {
-			t.Fatal("failed to Save:", err)
-		}
 	})
 
 	t.Run("Round 7", func(t *testing.T) {
 		addr := setup()
-		store, err := NewValkeyStoreWithDB(addr, "", "", 1, []byte("secret-key"))
-		if err != nil {
-			t.Fatal(err.Error())
-		}
-		defer store.Close()
-
-		req, _ := http.NewRequest("GET", "http://localhost:8080/", nil)
-		rsp := NewRecorder()
-		session, err := store.Get(req, "session-key")
-		if err != nil {
-			t.Fatalf("Error getting session: %v", err)
-		}
-		flashes := session.Flashes()
-		if len(flashes) != 0 {
-			t.Errorf("Expected empty flashes; Got %v", flashes)
-		}
-		session.AddFlash("foo")
-		if err = sessions.Save(req, rsp); err != nil {
-			t.Fatalf("Error saving session: %v", err)
-		}
-		hdr := rsp.Header()
-		cookies, ok = hdr["Set-Cookie"]
-		if !ok || len(cookies) != 1 {
-			t.Fatalf("No cookies. Header: %s", hdr)
-		}
-
-		req.Header.Add("Cookie", cookies[0])
-		session, err = store.Get(req, "session-key")
-		if err != nil {
-			t.Fatalf("Error getting session: %v", err)
-		}
-		flashes = session.Flashes()
-		if len(flashes) != 1 {
-			t.Fatalf("Expected flashes; Got %v", flashes)
-		}
-		if flashes[0] != "foo" {
-			t.Errorf("Expected foo,bar; Got %v", flashes)
-		}
-	})
-
-	t.Run("Round 8", func(t *testing.T) {
-		addr := setup()
-		store, err := NewValkeyStore(addr, "", "", []byte("secret-key"))
-		store.SetSerializer(JSONSerializer{})
+		store, err := NewWithDatabase(addr, "", "", 1, []byte("secret-key"))
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -347,20 +298,16 @@ func TestValkeyStore(t *testing.T) {
 }
 
 func TestPingGoodPort(t *testing.T) {
-	store, _ := NewValkeyStore([]string{":6379"}, "", "", []byte("secret-key"))
+	store, _ := New([]string{":6379"}, "", "", []byte("secret-key"))
 	defer store.Close()
-	ok, err := store.ping()
-	if err != nil {
+	if err := store.ping(); err != nil {
 		t.Error(err.Error())
-	}
-	if !ok {
-		t.Error("Expected server to PONG")
 	}
 }
 
 func TestNewValkeyStoreWithURL(t *testing.T) {
 	t.Run("Valid URL", func(t *testing.T) {
-		store, err := NewValkeyStoreWithURL("redis://localhost:6379", []byte("secret-key"))
+		store, err := NewWithURL("redis://localhost:6379", []byte("secret-key"))
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
@@ -390,7 +337,7 @@ func TestNewValkeyStoreWithURL(t *testing.T) {
 
 func ExampleValkeyStore() {
 	// RedisStore
-	store, err := NewValkeyStore([]string{":6379"}, "", "", []byte("secret-key"))
+	store, err := New([]string{":6379"}, "", "", []byte("secret-key"))
 	if err != nil {
 		panic(err)
 	}
