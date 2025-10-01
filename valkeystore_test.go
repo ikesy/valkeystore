@@ -14,19 +14,19 @@ import (
 )
 
 const (
-	defaultValkeyHost = "127.0.0.1"
-	defaultValkeyPort = "6379"
+	defaultHost = "127.0.0.1"
+	defaultPort = "6379"
 )
 
 func setup() []string {
 	addr := os.Getenv("VALKEY_HOST")
 	if addr == "" {
-		addr = defaultValkeyHost
+		addr = defaultHost
 	}
 
 	port := os.Getenv("VALKEY_PORT")
 	if port == "" {
-		port = defaultValkeyPort
+		port = defaultPort
 	}
 
 	return []string{
@@ -101,7 +101,6 @@ func TestValkeyStore(t *testing.T) {
 	t.Run("Round 1", func(t *testing.T) {
 		addr := setup()
 		store, err := New(addr, "", "", []byte("secret-key"))
-
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -237,7 +236,7 @@ func TestValkeyStore(t *testing.T) {
 		if err != nil {
 			t.Fatal(err.Error())
 		}
-		req, err := http.NewRequest("GET", "http://www.example.com", nil)
+		req, err := http.NewRequest("GET", "https://www.example.com", nil)
 		if err != nil {
 			t.Fatal("failed to create request", err)
 		}
@@ -319,6 +318,7 @@ func TestNewValkeyStoreWithURL(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Error getting session: %v", err)
 		}
+
 		flashes := session.Flashes()
 		if len(flashes) != 0 {
 			t.Errorf("Expected empty flashes; Got %v", flashes)

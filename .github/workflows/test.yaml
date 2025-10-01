@@ -20,6 +20,11 @@ jobs:
 
       - run: go mod tidy
 
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+
   test:
     strategy:
       matrix:
