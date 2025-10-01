@@ -216,7 +216,7 @@ func (r *ValkeyStore) save(session *sessions.Session) error {
 		return fmt.Errorf("sessionstore: the value to store is too big")
 	}
 
-	return r.client.Do(context.Background(), r.client.B().Setex().Key(r.keyPrefix+session.ID).Seconds(int64(r.Options.MaxAge)).Value(string(buffer.Bytes())).Build()).Error()
+	return r.client.Do(context.Background(), r.client.B().Setex().Key(r.keyPrefix+session.ID).Seconds(int64(r.Options.MaxAge)).Value(buffer.String()).Build()).Error()
 }
 
 // load reads the session from valkey.
