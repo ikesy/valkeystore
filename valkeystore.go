@@ -121,7 +121,8 @@ func (r *ValkeyStore) Get(request *http.Request, name string) (*sessions.Session
 func (r *ValkeyStore) New(request *http.Request, name string) (*sessions.Session, error) {
 	var err error
 	session := sessions.NewSession(r, name)
-	session.Options = &*r.Options
+	options := *r.Options
+	session.Options = &options
 	session.IsNew = true
 
 	if c, errCookie := request.Cookie(name); errCookie == nil {
