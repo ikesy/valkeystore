@@ -336,7 +336,7 @@ func TestNewValkeyStoreWithURL(t *testing.T) {
 }
 
 func ExampleValkeyStore() {
-	// RedisStore
+	// valkeystore
 	store, err := New([]string{":6379"}, "", "", []byte("secret-key"))
 	if err != nil {
 		panic(err)
