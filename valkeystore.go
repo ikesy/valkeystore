@@ -170,26 +170,6 @@ func (r *ValkeyStore) Save(request *http.Request, writer http.ResponseWriter, se
 	return nil
 }
 
-// Delete removes the session from valkey, and sets the cookie to expire.
-func (r *ValkeyStore) Delete(request *http.Request, writer http.ResponseWriter, session *sessions.Session) error {
-	if err := r.client.Do(
-		context.Background(),
-		r.client.B().Del().Key(r.keyPrefix+session.ID).Build(),
-	).Error(); err != nil {
-		return err
-	}
-	// Set cookie to expire.
-	options := *session.Options
-	options.MaxAge = -1
-	http.SetCookie(writer, sessions.NewCookie(session.Name(), "", &options))
-	// Clear session values.
-	for key := range session.Values {
-		delete(session.Values, key)
-	}
-
-	return nil
-}
-
 // ping does an internal ping against a valkey server.
 func (r *ValkeyStore) ping() error {
 	data, err := r.client.Do(context.Background(), r.client.B().Ping().Build()).ToString()

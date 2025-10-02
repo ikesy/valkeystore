@@ -76,7 +76,7 @@ func main() {
 
 ### SetKeyPrefix
 
-Sets the prefix for session keys in Redis.
+Sets the key prefix for session keys in valkey.
 
 ```go
 store.SetKeyPrefix("myprefix-")
