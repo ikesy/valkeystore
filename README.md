@@ -39,7 +39,7 @@ import (
 
 func main() {
   // Fetch new store.
-  store, err := valkeystore.NewValkeyStore([]string{":6379"}, "", "", []byte("secret-key"))
+  store, err := valkeystore.New([]string{":6379"}, "", "", []byte("secret-key"))
   if err != nil {
     panic(err)
   }
