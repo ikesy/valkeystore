@@ -1,4 +1,4 @@
-# valkey
+# valkeystore
 
 [![GoDoc](https://godoc.org/github.com/ikesy/valkeystore?status.svg)](https://godoc.org/github.com/ikesy/valkeystore)
 [![Run Tests](https://github.com/ikesy/valkeystore/actions/workflows/test.yaml/badge.svg)](https://github.com/ikesy/valkeystore/actions/workflows/test.yaml)
@@ -10,7 +10,7 @@ A session store backend for [gorilla/sessions](http://www.gorillatoolkit.org/pkg
 
 ## Requirements
 
-Depends on the [valkey-go](https://github.com/valkey-io/valkey-go) Valkey library.
+Depends on the [valkey-go](https://github.com/valkey-io/valkey-go) valkey library.
 
 ## Installation
 
